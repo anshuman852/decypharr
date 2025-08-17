@@ -209,17 +209,25 @@ func (s *Store) processSymlink(torrent *Torrent, debridTorrent *types.Torrent) (
 		select {
 		case <-ticker.C:
 			for path, file := range pending {
-				fullFilePath := filepath.Join(torrentRclonePath, file.Path)
-				if _, err := os.Stat(fullFilePath); !os.IsNotExist(err) {
-					fileSymlinkPath := filepath.Join(torrentSymlinkPath, file.Name)
-					if err := os.Symlink(fullFilePath, fileSymlinkPath); err != nil && !os.IsExist(err) {
-						s.logger.Warn().Msgf("Failed to create symlink: %s: %v", fileSymlinkPath, err)
-					} else {
-						filePaths = append(filePaths, fileSymlinkPath)
-						delete(pending, path)
-						s.logger.Info().Msgf("File is ready: %s", file.Name)
-					}
-				}
+			    fullFilePath := filepath.Join(torrentRclonePath, file.Path)
+			    if _, err := os.Stat(fullFilePath); err != nil {
+			        if os.IsNotExist(err) {
+			            s.logger.Debug().Msgf("File not found: %s (pending: %s)", fullFilePath, file.Name)
+			        } else {
+			            s.logger.Debug().Msgf("Error checking file: %s (pending: %s): %v", fullFilePath, file.Name, err)
+			        }
+			        continue
+			    } else {
+			        s.logger.Debug().Msgf("File exists: %s (pending: %s)", fullFilePath, file.Name)
+			    }
+			    fileSymlinkPath := filepath.Join(torrentSymlinkPath, file.Name)
+			    if err := os.Symlink(fullFilePath, fileSymlinkPath); err != nil && !os.IsExist(err) {
+			        s.logger.Warn().Msgf("Failed to create symlink: %s: %v", fileSymlinkPath, err)
+			    } else {
+			        filePaths = append(filePaths, fileSymlinkPath)
+			        delete(pending, path)
+			        s.logger.Info().Msgf("File is ready: %s", file.Name)
+			    }
 			}
 		case <-timeout:
 			s.logger.Warn().Msgf("Timeout waiting for files, %d files still pending", len(pending))
